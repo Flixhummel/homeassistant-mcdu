@@ -26,7 +26,7 @@ Early development. Roadmap (see the concept document in the ioBroker repo,
 |---|---|---|
 | 0 | Protocol spec, repo scaffold, config flow with MQTT device discovery, online sensor, button events | ✅ |
 | 1 | Page engine port (rendering, colors/segments, pagination), LSK navigation | ✅ |
-| 2 | Live entity values on pages, LSK actions, LED + brightness entities | – |
+| 2 | Live entity values on pages, LSK actions, LED + brightness entities | ✅ |
 | 3 | Scratchpad input, validation from entity metadata, confirmation dialogs | – |
 | 4 | Configuration panel (sidebar): live display preview, page tree, entity pickers | – |
 | 5 | Page generators (from areas/domains), profiles, ioBroker config import | – |
@@ -38,17 +38,32 @@ Early development. Roadmap (see the concept document in the ioBroker repo,
 - A running [`mcdu-client`](https://github.com/Flixhummel/ioBroker.mcdu/tree/main/mcdu-client)
   connected to the same broker
 
-## Installation (development)
+## Installation
 
-Copy `custom_components/mcdu/` into your HA `config/custom_components/` directory and
-restart Home Assistant. Then add the integration via *Settings → Devices & Services →
-Add Integration → WinWing MCDU*. Devices announcing themselves on
-`mcdu/+/status/online` are discovered automatically.
+**Via HACS (recommended):** HACS → Custom repositories → add
+`https://github.com/Flixhummel/homeassistant-mcdu` (type: Integration) → download
+"WinWing MCDU" → restart Home Assistant.
 
-## What you get today (Phase 0)
+**Manual:** Copy `custom_components/mcdu/` into your HA `config/custom_components/`
+directory and restart Home Assistant.
+
+Then add the integration via *Settings → Devices & Services → Add Integration →
+WinWing MCDU*. Devices announcing themselves on `mcdu/+/status/online` are
+discovered automatically.
+
+## What you get today
 
 - **Config flow** with automatic device discovery over MQTT
 - **Device** with an `Online` connectivity sensor (from the client's retained status topic)
+- **Pages on the MCDU display**: configured pages render with sub-labels, left/right
+  columns, per-side colors, pagination and a breadcrumb status bar; **live entity
+  values** re-render automatically when the underlying entity changes
+- **Navigation on the hardware**: LSK keys follow `navigation` buttons,
+  `datapoint` buttons toggle/increment/decrement entities, CLR goes to the parent
+  page, SLEW left/right cycles sibling pages, SLEW up/down scrolls paginated pages,
+  BRT/DIM adjusts both backlights
+- **Entities**: switches for the 9 indicator LEDs (FAIL, FM, MCDU, ...), brightness
+  sliders (0–255) for keyboard and screen backlight
 - **`mcdu_button` events** on the HA event bus for every hardware button
   (`{device_id, button, action}`) — usable in automations right now:
 

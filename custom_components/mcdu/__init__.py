@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from .controller import McduController
 from .hub import McduConfigEntry, McduHub
 
-PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR]
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.NUMBER, Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: McduConfigEntry) -> bool:
@@ -31,5 +31,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: McduConfigEntry) -> bool
 async def async_unload_entry(hass: HomeAssistant, entry: McduConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        await entry.runtime_data.async_stop()
+        hub = entry.runtime_data
+        if hub.controller:
+            await hub.controller.async_stop()
+        await hub.async_stop()
     return unload_ok

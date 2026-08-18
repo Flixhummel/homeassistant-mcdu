@@ -9,12 +9,10 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
 from .hub import McduConfigEntry, McduHub
 
 
@@ -38,12 +36,7 @@ class McduOnlineSensor(BinarySensorEntity):
     def __init__(self, hub: McduHub) -> None:
         self._hub = hub
         self._attr_unique_id = f"{hub.device_id}_online"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, hub.device_id)},
-            name=f"MCDU {hub.device_id}",
-            manufacturer="WinWing",
-            model="MCDU-32-CAPTAIN",
-        )
+        self._attr_device_info = hub.device_info
 
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(

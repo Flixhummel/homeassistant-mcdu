@@ -17,12 +17,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
+from homeassistant.helpers.device_registry import DeviceInfo
+
 from .const import (
     CONF_DEVICE_ID,
     CONF_TOPIC_PREFIX,
     DEFAULT_TOPIC_PREFIX,
     DOMAIN,
     EVENT_BUTTON,
+    LED_NAMES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,11 +45,30 @@ class McduHub:
         # Set during setup: async callable(button, action) and the controller
         self.button_handler = None
         self.controller = None
+        # Local LED state cache (the client does not report LED state back).
+        # Backlights carry brightness 0-255, indicator LEDs are boolean.
+        self.leds: dict[str, Any] = {name: False for name in LED_NAMES}
+        self.leds["BACKLIGHT"] = 128
+        self.leds["SCREEN_BACKLIGHT"] = 128
 
     @property
     def signal_status(self) -> str:
         """Dispatcher signal fired when the device status changes."""
         return f"{DOMAIN}_{self.device_id}_status"
+
+    @property
+    def signal_leds(self) -> str:
+        """Dispatcher signal fired when an LED value changes."""
+        return f"{DOMAIN}_{self.device_id}_leds"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.device_id)},
+            name=f"MCDU {self.device_id}",
+            manufacturer="WinWing",
+            model="MCDU-32-CAPTAIN",
+        )
 
     def topic(self, suffix: str) -> str:
         return f"{self.prefix}/{self.device_id}/{suffix}"
@@ -73,6 +95,24 @@ class McduHub:
         await mqtt.async_publish(
             self.hass, self.topic(suffix), json.dumps(payload), qos=1, retain=retain
         )
+
+    async def async_set_led(self, name: str, value: bool | int) -> None:
+        """Set a single LED (bool for indicators, 0-255 for backlights).
+
+        Protocol note: LEDs are published AFTER any display update on the wire;
+        callers changing both must render the display first.
+        """
+        if name not in self.leds:
+            _LOGGER.warning("Unknown LED: %s", name)
+            return
+        self.leds[name] = value
+        payload: dict[str, Any] = {"name": name}
+        if isinstance(value, bool):
+            payload["state"] = value
+        else:
+            payload["brightness"] = max(0, min(255, int(value)))
+        await self.async_publish("leds/single", payload)
+        async_dispatcher_send(self.hass, self.signal_leds)
 
     @callback
     def _status_received(self, msg: mqtt.ReceiveMessage) -> None:
