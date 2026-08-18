@@ -65,7 +65,11 @@ async def ws_pages_get(hass, connection, msg):
         return
     connection.send_result(
         msg["id"],
-        {"pages": controller.engine.pages, "current_page": controller.current_page_id},
+        {
+            "pages": controller.engine.pages,
+            "function_keys": controller.function_keys,
+            "current_page": controller.current_page_id,
+        },
     )
 
 
@@ -74,11 +78,12 @@ async def ws_pages_get(hass, connection, msg):
         vol.Required("type"): "mcdu/pages/save",
         vol.Required("entry_id"): str,
         vol.Required("pages"): list,
+        vol.Optional("function_keys"): dict,
     }
 )
 @websocket_api.async_response
 async def ws_pages_save(hass, connection, msg):
-    from .controller import _valid_pages  # local import avoids cycle
+    from .controller import _valid_function_keys, _valid_pages  # avoids cycle
 
     controller = _controller(hass, msg["entry_id"])
     if controller is None:
@@ -92,8 +97,13 @@ async def ws_pages_save(hass, connection, msg):
         )
         return
 
-    await controller.store.async_save({"pages": pages})
-    await controller.async_apply_pages(pages)
+    function_keys = _valid_function_keys(
+        msg.get("function_keys", controller.function_keys)
+    )
+    await controller.store.async_save(
+        {"pages": pages, "functionKeys": function_keys}
+    )
+    await controller.async_apply_config(pages, function_keys)
     connection.send_result(msg["id"], {"saved": True})
 
 

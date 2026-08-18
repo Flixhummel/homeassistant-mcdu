@@ -31,6 +31,22 @@ COLORS = [
     "blue",
 ]
 
+# Configurable function keys (physical layout order on the WinWing MCDU)
+FUNCTION_KEYS = [
+    "DIR",
+    "PROG",
+    "PERF",
+    "INIT",
+    "DATA",
+    "FPLN",
+    "RAD",
+    "FUEL",
+    "SEC",
+    "ATC",
+    "MENU",
+    "AIRPORT",
+]
+
 LED_NAMES = [
     "FAIL",
     "FM",

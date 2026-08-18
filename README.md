@@ -29,7 +29,7 @@ Early development. Roadmap (see the concept document in the ioBroker repo,
 | 2 | Live entity values on pages, LSK actions, LED + brightness entities | ✅ |
 | 3 | Scratchpad input, validation from entity metadata | ✅ (confirmation dialogs pending) |
 | 4 | Configuration panel (sidebar): live display preview, page tree, entity pickers | ✅ MVP |
-| 5 | Page generators (from areas/domains), profiles, ioBroker config import | – |
+| 5 | Page generators (from areas), function key config | ✅ (profiles + ioBroker import pending) |
 | 6 | HACS release | – |
 
 ## Requirements
@@ -70,10 +70,17 @@ discovered automatically.
 - **Entities**: switches for the 9 indicator LEDs (FAIL, FM, MCDU, ...), brightness
   sliders (0–255) for keyboard and screen backlight
 - **MCDU sidebar panel** (admin only): configure all pages visually — page tree
-  with parent hierarchy, per-LSK editor with entity autocomplete, colors,
-  formats and navigation targets, and a **live display preview** rendered by the
-  same engine that drives the hardware (click a preview row to jump to its
-  editor). Save applies instantly to the device
+  with parent hierarchy, a per-line editor where each side is simply *nothing,
+  text, an entity, or a page link* (only relevant fields appear), entity
+  autocomplete with friendly names, colors and formats, and a **live display
+  preview** rendered by the same engine that drives the hardware (click a
+  preview row to jump to its editor). Save applies instantly to the device
+- **"+ From area"**: generate a complete page from a Home Assistant area with
+  one click — lights and switches first, then climate and sensors; edit freely
+  afterwards. Pages longer than 6 lines paginate automatically
+- **Function keys**: assign pages to the 12 hardware keys (DIR, PROG, PERF,
+  INIT, DATA, FPLN, RAD, FUEL, SEC, ATC, MENU, AIRPORT) in a visual keypad —
+  pressing the key jumps to its page from anywhere
 - **`mcdu_button` events** on the HA event bus for every hardware button
   (`{device_id, button, action}`) — usable in automations right now:
 

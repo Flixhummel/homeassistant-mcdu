@@ -17,7 +17,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, FUNCTION_KEYS
 from .input_engine import InputModeManager, Scratchpad
 from .page_engine import COLUMNS, PageEngine, pad_or_truncate, sanitize_ascii
 
@@ -74,6 +74,17 @@ TEXT_DOMAINS = ("text", "input_text")
 SELECT_DOMAINS = ("select", "input_select")
 
 
+def _valid_function_keys(data: object) -> dict[str, str]:
+    """Keep only well-formed key→page assignments."""
+    if not isinstance(data, dict):
+        return {}
+    return {
+        key: target
+        for key, target in data.items()
+        if key in FUNCTION_KEYS and isinstance(target, str) and target
+    }
+
+
 def _valid_pages(data: object) -> bool:
     if not isinstance(data, list) or not data:
         return False
@@ -89,11 +100,18 @@ class McduController:
     """Drives one MCDU device: pages, navigation, rendering."""
 
     def __init__(
-        self, hass: HomeAssistant, hub: McduHub, store: Store, pages: list[dict]
+        self,
+        hass: HomeAssistant,
+        hub: McduHub,
+        store: Store,
+        pages: list[dict],
+        function_keys: dict[str, str] | None = None,
     ) -> None:
         self.hass = hass
         self.hub = hub
         self.store = store
+        # Function key → target page id (unassigned keys are absent)
+        self.function_keys: dict[str, str] = function_keys or {}
         self.scratchpad = Scratchpad()
         self.input_manager = InputModeManager(self.scratchpad)
         self.engine = PageEngine(
@@ -129,7 +147,8 @@ class McduController:
                 hub.device_id,
             )
             pages = DEFAULT_PAGES
-        return cls(hass, hub, store, pages)
+        function_keys = _valid_function_keys((data or {}).get("functionKeys"))
+        return cls(hass, hub, store, pages, function_keys)
 
     # ------------------------------------------------------------------
     # Rendering
@@ -203,9 +222,13 @@ class McduController:
             self._unsub_track()
             self._unsub_track = None
 
-    async def async_apply_pages(self, pages: list[dict]) -> None:
-        """Apply a new page configuration (from the panel) and re-render."""
+    async def async_apply_config(
+        self, pages: list[dict], function_keys: dict[str, str] | None = None
+    ) -> None:
+        """Apply a new configuration (from the panel) and re-render."""
         self.engine.pages = pages
+        if function_keys is not None:
+            self.function_keys = function_keys
         if not self.engine.find_page(self.current_page_id) and pages:
             self.current_page_id = pages[0]["id"]
         self.engine.current_page_offset = 0
@@ -242,6 +265,9 @@ class McduController:
             await self._handle_page_slew(button)
         elif button in ("BRT", "DIM"):
             await self._handle_brightness(button)
+        elif button in FUNCTION_KEYS:
+            if target := self.function_keys.get(button):
+                await self.async_switch_page(target)
 
     @staticmethod
     def _keypad_char(button: str) -> str | None:
