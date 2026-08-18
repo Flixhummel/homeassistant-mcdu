@@ -28,7 +28,7 @@ Early development. Roadmap (see the concept document in the ioBroker repo,
 | 1 | Page engine port (rendering, colors/segments, pagination), LSK navigation | ✅ |
 | 2 | Live entity values on pages, LSK actions, LED + brightness entities | ✅ |
 | 3 | Scratchpad input, validation from entity metadata | ✅ (confirmation dialogs pending) |
-| 4 | Configuration panel (sidebar): live display preview, page tree, entity pickers | – |
+| 4 | Configuration panel (sidebar): live display preview, page tree, entity pickers | ✅ MVP |
 | 5 | Page generators (from areas/domains), profiles, ioBroker config import | – |
 | 6 | HACS release | – |
 
@@ -69,6 +69,11 @@ discovered automatically.
   input for editing. Double-CLR jumps home; PLUSMINUS toggles the sign
 - **Entities**: switches for the 9 indicator LEDs (FAIL, FM, MCDU, ...), brightness
   sliders (0–255) for keyboard and screen backlight
+- **MCDU sidebar panel** (admin only): configure all pages visually — page tree
+  with parent hierarchy, per-LSK editor with entity autocomplete, colors,
+  formats and navigation targets, and a **live display preview** rendered by the
+  same engine that drives the hardware (click a preview row to jump to its
+  editor). Save applies instantly to the device
 - **`mcdu_button` events** on the HA event bus for every hardware button
   (`{device_id, button, action}`) — usable in automations right now:
 

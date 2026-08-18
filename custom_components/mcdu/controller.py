@@ -203,6 +203,16 @@ class McduController:
             self._unsub_track()
             self._unsub_track = None
 
+    async def async_apply_pages(self, pages: list[dict]) -> None:
+        """Apply a new page configuration (from the panel) and re-render."""
+        self.engine.pages = pages
+        if not self.engine.find_page(self.current_page_id) and pages:
+            self.current_page_id = pages[0]["id"]
+        self.engine.current_page_offset = 0
+        self._tracked_page_id = None  # force re-subscription of sources
+        self._last_lines = None
+        await self.async_render()
+
     async def async_switch_page(self, page_id: str) -> None:
         if not self.engine.find_page(page_id):
             _LOGGER.warning("Unknown page: %s", page_id)
