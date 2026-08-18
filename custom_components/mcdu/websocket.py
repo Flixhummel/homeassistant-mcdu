@@ -68,6 +68,7 @@ async def ws_pages_get(hass, connection, msg):
         {
             "pages": controller.engine.pages,
             "function_keys": controller.function_keys,
+            "led_bindings": controller.led_bindings,
             "current_page": controller.current_page_id,
         },
     )
@@ -79,11 +80,16 @@ async def ws_pages_get(hass, connection, msg):
         vol.Required("entry_id"): str,
         vol.Required("pages"): list,
         vol.Optional("function_keys"): dict,
+        vol.Optional("led_bindings"): dict,
     }
 )
 @websocket_api.async_response
 async def ws_pages_save(hass, connection, msg):
-    from .controller import _valid_function_keys, _valid_pages  # avoids cycle
+    from .controller import (  # avoids cycle
+        _valid_function_keys,
+        _valid_led_bindings,
+        _valid_pages,
+    )
 
     controller = _controller(hass, msg["entry_id"])
     if controller is None:
@@ -100,10 +106,13 @@ async def ws_pages_save(hass, connection, msg):
     function_keys = _valid_function_keys(
         msg.get("function_keys", controller.function_keys)
     )
-    await controller.store.async_save(
-        {"pages": pages, "functionKeys": function_keys}
+    led_bindings = _valid_led_bindings(
+        msg.get("led_bindings", controller.led_bindings)
     )
-    await controller.async_apply_config(pages, function_keys)
+    await controller.store.async_save(
+        {"pages": pages, "functionKeys": function_keys, "ledBindings": led_bindings}
+    )
+    await controller.async_apply_config(pages, function_keys, led_bindings)
     connection.send_result(msg["id"], {"saved": True})
 
 

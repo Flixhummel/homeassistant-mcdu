@@ -69,18 +69,21 @@ discovered automatically.
   input for editing. Double-CLR jumps home; PLUSMINUS toggles the sign
 - **Entities**: switches for the 9 indicator LEDs (FAIL, FM, MCDU, ...), brightness
   sliders (0–255) for keyboard and screen backlight
-- **MCDU sidebar panel** (admin only): configure all pages visually — page tree
-  with parent hierarchy, a per-line editor where each side is simply *nothing,
-  text, an entity, or a page link* (only relevant fields appear), entity
-  autocomplete with friendly names, colors and formats, and a **live display
-  preview** rendered by the same engine that drives the hardware (click a
-  preview row to jump to its editor). Save applies instantly to the device
-- **"+ From area"**: generate a complete page from a Home Assistant area with
-  one click — lights and switches first, then climate and sensors; edit freely
-  afterwards. Pages longer than 6 lines paginate automatically
-- **Function keys**: assign pages to the 12 hardware keys (DIR, PROG, PERF,
-  INIT, DATA, FPLN, RAD, FUEL, SEC, ATC, MENU, AIRPORT) in a visual keypad —
-  pressing the key jumps to its page from anywhere
+- **MCDU sidebar panel** (admin only) built around an **interactive image of the
+  MCDU**: the display (live preview rendered by the same engine that drives the
+  hardware), the 12 LSK bars, all function keys and the LED strips are
+  clickable. Click an LSK or a display row half to edit that line side (each
+  side is simply *nothing, text, an entity, or a page link* — only relevant
+  fields appear), click a function key to assign it a page, click an LED to
+  bind it to an entity. Save applies instantly to the device
+- **"+ Import…" from a dashboard view**: generate a page from any Lovelace
+  dashboard view — its entities and names are already curated, so no junk
+  comes along. Importing from an HA area is still available as fallback.
+  Pages longer than 6 lines paginate automatically
+- **Function keys**: DIR, PROG, PERF, INIT, DATA, FPLN, RAD, FUEL, SEC, ATC,
+  MENU, AIRPORT each jump to their assigned page from anywhere
+- **LED bindings**: each of the 9 indicator LEDs can follow an entity — lit
+  while the entity is on / greater than zero (e.g. RDY ← washing machine done)
 - **`mcdu_button` events** on the HA event bus for every hardware button
   (`{device_id, button, action}`) — usable in automations right now:
 

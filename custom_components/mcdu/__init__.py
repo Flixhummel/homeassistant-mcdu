@@ -59,6 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: McduConfigEntry) -> bool
     # Publish the current page as retained frame; a (re)connecting client
     # renders it immediately without further interaction.
     await controller.async_render()
+    await controller.async_sync_leds()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

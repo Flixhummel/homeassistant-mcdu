@@ -17,7 +17,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, FUNCTION_KEYS
+from .const import DOMAIN, FUNCTION_KEYS, LED_NAMES
 from .input_engine import InputModeManager, Scratchpad
 from .page_engine import COLUMNS, PageEngine, pad_or_truncate, sanitize_ascii
 
@@ -74,6 +74,23 @@ TEXT_DOMAINS = ("text", "input_text")
 SELECT_DOMAINS = ("select", "input_select")
 
 
+# Entity states that light a bound LED (plus any numeric value > 0)
+LED_ON_STATES = {"on", "home", "open", "playing", "unlocked", "heat", "cool", "auto"}
+
+INDICATOR_LED_NAMES = [n for n in LED_NAMES if n not in ("BACKLIGHT", "SCREEN_BACKLIGHT")]
+
+
+def _valid_led_bindings(data: object) -> dict[str, str]:
+    """Keep only well-formed LED→entity bindings (indicator LEDs only)."""
+    if not isinstance(data, dict):
+        return {}
+    return {
+        led: entity
+        for led, entity in data.items()
+        if led in INDICATOR_LED_NAMES and isinstance(entity, str) and entity
+    }
+
+
 def _valid_function_keys(data: object) -> dict[str, str]:
     """Keep only well-formed key→page assignments."""
     if not isinstance(data, dict):
@@ -106,12 +123,16 @@ class McduController:
         store: Store,
         pages: list[dict],
         function_keys: dict[str, str] | None = None,
+        led_bindings: dict[str, str] | None = None,
     ) -> None:
         self.hass = hass
         self.hub = hub
         self.store = store
         # Function key → target page id (unassigned keys are absent)
         self.function_keys: dict[str, str] = function_keys or {}
+        # Indicator LED → entity id (LED follows the entity's on/off state)
+        self.led_bindings: dict[str, str] = led_bindings or {}
+        self._unsub_led_track = None
         self.scratchpad = Scratchpad()
         self.input_manager = InputModeManager(self.scratchpad)
         self.engine = PageEngine(
@@ -148,7 +169,10 @@ class McduController:
             )
             pages = DEFAULT_PAGES
         function_keys = _valid_function_keys((data or {}).get("functionKeys"))
-        return cls(hass, hub, store, pages, function_keys)
+        led_bindings = _valid_led_bindings((data or {}).get("ledBindings"))
+        controller = cls(hass, hub, store, pages, function_keys, led_bindings)
+        controller._update_led_tracking()
+        return controller
 
     # ------------------------------------------------------------------
     # Rendering
@@ -221,20 +245,65 @@ class McduController:
         if self._unsub_track:
             self._unsub_track()
             self._unsub_track = None
+        if self._unsub_led_track:
+            self._unsub_led_track()
+            self._unsub_led_track = None
 
     async def async_apply_config(
-        self, pages: list[dict], function_keys: dict[str, str] | None = None
+        self,
+        pages: list[dict],
+        function_keys: dict[str, str] | None = None,
+        led_bindings: dict[str, str] | None = None,
     ) -> None:
         """Apply a new configuration (from the panel) and re-render."""
         self.engine.pages = pages
         if function_keys is not None:
             self.function_keys = function_keys
+        if led_bindings is not None:
+            self.led_bindings = led_bindings
+            self._update_led_tracking()
         if not self.engine.find_page(self.current_page_id) and pages:
             self.current_page_id = pages[0]["id"]
         self.engine.current_page_offset = 0
         self._tracked_page_id = None  # force re-subscription of sources
         self._last_lines = None
         await self.async_render()
+        await self.async_sync_leds()
+
+    # ------------------------------------------------------------------
+    # LED bindings: indicator LED follows the bound entity's state
+    # ------------------------------------------------------------------
+
+    def _update_led_tracking(self) -> None:
+        if self._unsub_led_track:
+            self._unsub_led_track()
+            self._unsub_led_track = None
+        entities = sorted(set(self.led_bindings.values()))
+        if entities:
+            self._unsub_led_track = async_track_state_change_event(
+                self.hass, entities, self._led_entity_changed
+            )
+
+    @staticmethod
+    def _led_truthy(state) -> bool:
+        if state is None or state.state in UNAVAILABLE_STATES:
+            return False
+        if state.state in LED_ON_STATES:
+            return True
+        try:
+            return float(state.state) > 0
+        except ValueError:
+            return False
+
+    @callback
+    def _led_entity_changed(self, _event: Event) -> None:
+        self.hass.async_create_task(self.async_sync_leds())
+
+    async def async_sync_leds(self) -> None:
+        for led, entity_id in self.led_bindings.items():
+            value = self._led_truthy(self.hass.states.get(entity_id))
+            if bool(self.hub.leds.get(led)) != value:
+                await self.hub.async_set_led(led, value)
 
     async def async_switch_page(self, page_id: str) -> None:
         if not self.engine.find_page(page_id):
