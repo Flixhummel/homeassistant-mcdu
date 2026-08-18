@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MCDU-Gerät hinzufügen",
+        "description": "{count} MCDU-Client(s) über MQTT gefunden. Wähle einen aus oder gib die Geräte-ID ein (die MQTT-Client-ID des mcdu-client auf dem Raspberry Pi).",
+        "data": {
+          "device_id": "Geräte-ID",
+          "topic_prefix": "MQTT-Topic-Präfix"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Dieses MCDU-Gerät ist bereits eingerichtet.",
+      "mqtt_unavailable": "Die MQTT-Integration ist nicht verfügbar. Richte zuerst MQTT ein."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "online": {
+        "name": "Online"
+      }
+    }
+  }
+}
