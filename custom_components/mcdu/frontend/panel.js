@@ -482,9 +482,10 @@ class McduPanel extends HTMLElement {
       .lsk:hover { outline:2px solid var(--primary-color); }
       .lsk.sel { outline:2px solid var(--primary-color); }
       .screen { flex:1; background:#0a0a0a; border-radius:8px; border:6px solid #2a2f38;
-             padding:8px 6px; }
-      .screen pre { margin:0; font-family:"Courier New",monospace; font-size:12.5px; line-height:1.45;
-             letter-spacing:.5px; cursor:pointer; }
+             padding:10px 6px; display:flex; flex-direction:column; align-items:center;
+             justify-content:space-between; }
+      .screen pre { margin:0; font-family:"Courier New",monospace; font-size:25px; line-height:1.28;
+             letter-spacing:0; cursor:pointer; }
       .screen pre:hover { background:#16202a; }
       .pager { display:flex; gap:8px; justify-content:center; margin:6px 0; align-items:center; }
       .kbd-area { display:flex; gap:6px; margin-top:10px; }
