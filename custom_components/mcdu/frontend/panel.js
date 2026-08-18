@@ -769,7 +769,9 @@ class McduPanel extends HTMLElement {
     const cfg = line[side];
     const d = cfg.display || {};
     const b = cfg.button || {};
-    const type = this._sideType(cfg);
+    // The chosen type sticks even while its fields are still empty —
+    // otherwise "Text"/"Entity" would collapse back to "—" immediately.
+    const type = this._sel.typeOverride || this._sideType(cfg);
     const colorOptions = (selected) =>
       `<option value="">default</option>` +
       COLORS.map((c) => `<option ${c === selected ? "selected" : ""}>${c}</option>`).join("");
@@ -1012,6 +1014,7 @@ class McduPanel extends HTMLElement {
       btn.addEventListener("click", () => {
         const line = this._line(this._sel.row);
         this._setSideType(line[this._sel.side], btn.dataset.type);
+        this._sel.typeOverride = btn.dataset.type === "none" ? null : btn.dataset.type;
         this._touch();
       })
     );
