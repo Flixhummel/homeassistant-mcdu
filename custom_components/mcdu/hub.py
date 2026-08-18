@@ -39,6 +39,9 @@ class McduHub:
         self.online: bool = False
         self.status: dict[str, Any] = {}
         self._unsubscribers: list = []
+        # Set during setup: async callable(button, action) and the controller
+        self.button_handler = None
+        self.controller = None
 
     @property
     def signal_status(self) -> str:
@@ -104,6 +107,8 @@ class McduHub:
                 "action": action,
             },
         )
+        if self.button_handler:
+            self.hass.async_create_task(self.button_handler(button, action))
 
 
 McduConfigEntry = ConfigEntry[McduHub]

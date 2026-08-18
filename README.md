@@ -25,7 +25,7 @@ Early development. Roadmap (see the concept document in the ioBroker repo,
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Protocol spec, repo scaffold, config flow with MQTT device discovery, online sensor, button events | ✅ |
-| 1 | Page engine port (rendering, colors/segments, pagination), LSK navigation | ⏳ |
+| 1 | Page engine port (rendering, colors/segments, pagination), LSK navigation | ✅ |
 | 2 | Live entity values on pages, LSK actions, LED + brightness entities | – |
 | 3 | Scratchpad input, validation from entity metadata, confirmation dialogs | – |
 | 4 | Configuration panel (sidebar): live display preview, page tree, entity pickers | – |
