@@ -18,7 +18,8 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .page_engine import PageEngine
+from .input_engine import InputModeManager, Scratchpad
+from .page_engine import COLUMNS, PageEngine, pad_or_truncate, sanitize_ascii
 
 if TYPE_CHECKING:
     from .hub import McduHub
@@ -64,6 +65,14 @@ DEFAULT_PAGES: list[dict] = [
 
 UNAVAILABLE_STATES = ("unavailable", "unknown")
 
+KEYPAD_SPECIAL = {"DOT": ".", "SLASH": "/", "SPACE": " "}
+
+# HA domain → datapoint metadata for the input engine
+BOOLEAN_DOMAINS = ("switch", "light", "input_boolean", "fan", "siren", "humidifier")
+NUMBER_DOMAINS = ("number", "input_number")
+TEXT_DOMAINS = ("text", "input_text")
+SELECT_DOMAINS = ("select", "input_select")
+
 
 def _valid_pages(data: object) -> bool:
     if not isinstance(data, list) or not data:
@@ -85,8 +94,16 @@ class McduController:
         self.hass = hass
         self.hub = hub
         self.store = store
+        self.scratchpad = Scratchpad()
+        self.input_manager = InputModeManager(self.scratchpad)
         self.engine = PageEngine(
-            pages, value_resolver=self._resolve_entity, clock=dt_util.now
+            pages,
+            value_resolver=self._resolve_entity,
+            scratchpad_provider=lambda: (
+                self.scratchpad.get_display(),
+                self.scratchpad.get_color(),
+            ),
+            clock=dt_util.now,
         )
         self.current_page_id: str | None = pages[0]["id"] if pages else None
         self._last_lines: list[dict] | None = None
@@ -205,12 +222,22 @@ class McduController:
             await self._handle_lsk(button)
         elif button == "CLR":
             await self._handle_clr()
+        elif button == "PLUSMINUS":
+            await self._execute_decision(self.input_manager.handle_plusminus())
+        elif (char := self._keypad_char(button)) is not None:
+            await self._execute_decision(self.input_manager.handle_key_input(char))
         elif button in ("SLEW_LEFT", "SLEW_RIGHT"):
             await self._handle_sibling_slew(button)
         elif button in ("SLEW_UP", "SLEW_DOWN"):
             await self._handle_page_slew(button)
         elif button in ("BRT", "DIM"):
             await self._handle_brightness(button)
+
+    @staticmethod
+    def _keypad_char(button: str) -> str | None:
+        if len(button) == 1 and (button.isdigit() or button.isupper()):
+            return button
+        return KEYPAD_SPECIAL.get(button)
 
     async def _handle_lsk(self, button: str) -> None:
         # LSK1L/LSK1R → row 3 ... LSK6L/LSK6R → row 13
@@ -221,20 +248,116 @@ class McduController:
         side = "left" if button.endswith("L") else "right"
 
         line = self.engine.line_at_row(row)
-        if not line:
-            return
-        btn = (line.get(side) or {}).get("button") or {}
-        btn_type = btn.get("type")
-        target = btn.get("target")
+        decision = self.input_manager.handle_lsk(line, side, self._entity_meta)
+        await self._execute_decision(decision)
 
-        if btn_type in ("navigation", "goto") and target:
-            await self.async_switch_page(target)
-        elif btn_type == "datapoint" and target:
-            await self._execute_datapoint_action(target, btn.get("action") or "toggle")
-        elif btn_type not in (None, "empty"):
-            _LOGGER.debug(
-                "Button type %s not implemented yet (row %s, %s)", btn_type, row, side
+    def _entity_meta(self, entity_id: str) -> dict | None:
+        """Map an HA entity to the input engine's datapoint metadata."""
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return None
+        domain = entity_id.split(".")[0]
+        attrs = state.attributes
+
+        if domain in BOOLEAN_DOMAINS:
+            return {"write": True, "type": "boolean"}
+        if domain in NUMBER_DOMAINS:
+            return {
+                "write": True,
+                "type": "number",
+                "min": attrs.get("min"),
+                "max": attrs.get("max"),
+            }
+        if domain in TEXT_DOMAINS:
+            return {"write": True, "type": "string"}
+        if domain in SELECT_DOMAINS:
+            return {"write": True, "type": "string", "options": attrs.get("options")}
+        # sensor, binary_sensor, everything else: read-only
+        return {"write": False, "type": "string"}
+
+    async def _execute_decision(self, decision: tuple) -> None:
+        """Execute a decision returned by the input engine."""
+        kind = decision[0]
+
+        if kind == "none":
+            return
+        if kind in ("render", "cleared", "error"):
+            # Scratchpad (line 14) changed
+            await self.async_render()
+        elif kind == "full":
+            await self.async_show_message("ERR SCRATCHPAD VOLL", "red", 3)
+        elif kind == "home":
+            pages = self.engine.pages
+            if pages:
+                await self.async_switch_page(pages[0]["id"])
+        elif kind == "parent":
+            parent = self.engine.parent_of(self.current_page_id)
+            if parent:
+                await self.async_switch_page(parent)
+        elif kind == "toggle":
+            await self.hass.services.async_call(
+                "homeassistant", "toggle", {"entity_id": decision[1]}, blocking=False
             )
+        elif kind == "write":
+            await self._write_entity(decision[1], decision[2])
+            await self.async_render()
+        elif kind == "action":
+            button = decision[1]
+            btn_type = button.get("type")
+            target = button.get("target")
+            if btn_type in ("navigation", "goto") and target:
+                await self.async_switch_page(target)
+            elif btn_type == "datapoint" and target:
+                await self._execute_datapoint_action(
+                    target, button.get("action") or "toggle"
+                )
+
+    async def _write_entity(self, entity_id: str, value: float | str) -> None:
+        """Write a validated scratchpad value to an HA entity."""
+        domain = entity_id.split(".")[0]
+        try:
+            if domain in NUMBER_DOMAINS:
+                await self.hass.services.async_call(
+                    domain, "set_value", {"entity_id": entity_id, "value": value},
+                    blocking=True,
+                )
+            elif domain in TEXT_DOMAINS:
+                await self.hass.services.async_call(
+                    domain, "set_value", {"entity_id": entity_id, "value": str(value)},
+                    blocking=True,
+                )
+            elif domain in SELECT_DOMAINS:
+                await self.hass.services.async_call(
+                    domain, "select_option",
+                    {"entity_id": entity_id, "option": str(value)},
+                    blocking=True,
+                )
+            else:
+                _LOGGER.warning("Cannot write to domain of %s", entity_id)
+                return
+            _LOGGER.info("Written %s: %s", entity_id, value)
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Failed to write %s", entity_id)
+            self.scratchpad.show_error("SCHREIBFEHLER")
+
+    async def async_show_message(self, text: str, color: str, seconds: float) -> None:
+        """Show a temporary message on line 13, then restore the page."""
+        await self.hub.async_publish(
+            "display/line",
+            {
+                "lineNumber": 13,
+                "text": pad_or_truncate(sanitize_ascii(text), COLUMNS),
+                "color": color,
+                "timestamp": int(time.time() * 1000),
+            },
+        )
+
+        async def _restore() -> None:
+            await asyncio.sleep(seconds)
+            self._last_lines = None  # bypass dedupe — line 13 was overwritten
+            await self.async_render()
+
+        self.hass.async_create_task(_restore())
 
     async def _execute_datapoint_action(self, entity_id: str, action: str) -> None:
         """Execute a datapoint button action on an HA entity.
@@ -275,11 +398,12 @@ class McduController:
         _LOGGER.warning("Unknown datapoint action: %s", action)
 
     async def _handle_clr(self) -> None:
+        """CLR: double-press → home, scratchpad clear/restore, parent page."""
         if not self.current_page_id:
             return
-        parent = self.engine.parent_of(self.current_page_id)
-        if parent:
-            await self.async_switch_page(parent)
+        has_parent = self.engine.parent_of(self.current_page_id) is not None
+        decision = self.input_manager.handle_clr(time.monotonic(), has_parent)
+        await self._execute_decision(decision)
 
     async def _handle_sibling_slew(self, button: str) -> None:
         if not self.current_page_id:

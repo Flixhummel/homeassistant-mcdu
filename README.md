@@ -27,7 +27,7 @@ Early development. Roadmap (see the concept document in the ioBroker repo,
 | 0 | Protocol spec, repo scaffold, config flow with MQTT device discovery, online sensor, button events | ✅ |
 | 1 | Page engine port (rendering, colors/segments, pagination), LSK navigation | ✅ |
 | 2 | Live entity values on pages, LSK actions, LED + brightness entities | ✅ |
-| 3 | Scratchpad input, validation from entity metadata, confirmation dialogs | – |
+| 3 | Scratchpad input, validation from entity metadata | ✅ (confirmation dialogs pending) |
 | 4 | Configuration panel (sidebar): live display preview, page tree, entity pickers | – |
 | 5 | Page generators (from areas/domains), profiles, ioBroker config import | – |
 | 6 | HACS release | – |
@@ -62,6 +62,11 @@ discovered automatically.
   `datapoint` buttons toggle/increment/decrement entities, CLR goes to the parent
   page, SLEW left/right cycles sibling pages, SLEW up/down scrolls paginated pages,
   BRT/DIM adjusts both backlights
+- **Scratchpad input**: type values on the keypad (line 14), press an LSK next to a
+  writable entity to set it — validated against the entity's metadata (numbers:
+  min/max, selects: options; read-only entities show SCHREIBGESCHUETZT). Errors
+  follow the Airbus pattern: the message replaces the scratchpad, CLR restores your
+  input for editing. Double-CLR jumps home; PLUSMINUS toggles the sign
 - **Entities**: switches for the 9 indicator LEDs (FAIL, FM, MCDU, ...), brightness
   sliders (0–255) for keyboard and screen backlight
 - **`mcdu_button` events** on the HA event bus for every hardware button
