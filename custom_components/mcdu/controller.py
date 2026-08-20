@@ -13,7 +13,10 @@ import time
 from typing import TYPE_CHECKING
 
 from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_change,
+)
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
@@ -133,6 +136,8 @@ class McduController:
         # Indicator LED → entity id (LED follows the entity's on/off state)
         self.led_bindings: dict[str, str] = led_bindings or {}
         self._unsub_led_track = None
+        # Re-render every full minute so the status bar clock stays current
+        self._unsub_clock = async_track_time_change(hass, self._minute_tick, second=0)
         self.scratchpad = Scratchpad()
         self.input_manager = InputModeManager(self.scratchpad)
         self.engine = PageEngine(
@@ -248,6 +253,9 @@ class McduController:
         if self._unsub_led_track:
             self._unsub_led_track()
             self._unsub_led_track = None
+        if self._unsub_clock:
+            self._unsub_clock()
+            self._unsub_clock = None
 
     async def async_apply_config(
         self,
@@ -294,6 +302,10 @@ class McduController:
             return float(state.state) > 0
         except ValueError:
             return False
+
+    @callback
+    def _minute_tick(self, _now) -> None:
+        self.hass.async_create_task(self.async_render())
 
     @callback
     def _led_entity_changed(self, _event: Event) -> None:

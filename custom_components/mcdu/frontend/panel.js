@@ -83,7 +83,14 @@ class McduPanel extends HTMLElement {
     if (!this._initialized) {
       this._initialized = true;
       this._loadDevices();
+      // Keep the preview clock current
+      this._clockTimer = setInterval(() => this._schedulePreview(), 60000);
     }
+  }
+
+  disconnectedCallback() {
+    clearInterval(this._clockTimer);
+    clearTimeout(this._previewTimer);
   }
 
   set narrow(_v) {}
