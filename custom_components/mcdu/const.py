@@ -31,13 +31,16 @@ COLORS = [
     "blue",
 ]
 
-# Configurable function keys (physical layout order on the WinWing MCDU)
+# Configurable function keys, in hardware code order. EMPTY_LEFT (row 1, next
+# to BRT) and EMPTY_RIGHT (next to AIRPORT) are the two unlabelled caps —
+# assignable like any other function key.
 FUNCTION_KEYS = [
     "DIR",
     "PROG",
     "PERF",
     "INIT",
     "DATA",
+    "EMPTY_LEFT",
     "FPLN",
     "RAD",
     "FUEL",
@@ -45,6 +48,7 @@ FUNCTION_KEYS = [
     "ATC",
     "MENU",
     "AIRPORT",
+    "EMPTY_RIGHT",
 ]
 
 LED_NAMES = [

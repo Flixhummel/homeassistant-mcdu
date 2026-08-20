@@ -24,7 +24,8 @@ const COLOR_HEX = {
   blue: "#00d5d5",
 };
 
-// Function key rows as on the hardware (null = blank cap, "BRT"/"DIM" static)
+// Function key rows as on the hardware. The two unlabelled caps
+// (EMPTY_LEFT next to BRT, EMPTY_RIGHT next to AIRPORT) are assignable too.
 const FK_ROWS = [
   [
     { key: "DIR", label: "DIR" },
@@ -32,7 +33,7 @@ const FK_ROWS = [
     { key: "PERF", label: "PERF" },
     { key: "INIT", label: "INIT" },
     { key: "DATA", label: "DATA" },
-    null,
+    { key: "EMPTY_LEFT", label: "", blank: true },
     { key: "BRT", label: "BRT", static: true },
   ],
   [
@@ -515,7 +516,9 @@ class McduPanel extends HTMLElement {
       .fk:hover { outline:2px solid var(--primary-color); }
       .fk.sel { outline:2px solid var(--primary-color); }
       .fk.assigned { color:#7fd58a; box-shadow: inset 0 0 6px rgba(80,220,110,.35); }
-      .fk.blank { background:#242424; cursor:default; }
+      .fk.blankcap { background:#242424; }
+      .fk .blankhint { color:#5c5c5c; font-size:13px; font-weight:normal; }
+      .fk .blanklabel { font-size:8px; letter-spacing:0; }
       .fk.static { background:#111; color:#999; cursor:default; }
       .fk.static:hover { outline:none; }
       .keypad { display:flex; gap:8px; margin-top:4px; }
@@ -626,21 +629,7 @@ class McduPanel extends HTMLElement {
     const screen = `<div class="screen">${this._renderPreviewLines()}</div>`;
 
     const fkeys = FK_ROWS.map(
-      (row) =>
-        `<div class="fkrow">${row
-          .map((k) => {
-            if (!k) return `<div class="fk blank"></div>`;
-            if (k.static)
-              return `<div class="fk static" title="${k.key}: fixed function (brightness)">${k.label}</div>`;
-            const assigned = this._functionKeys[k.key];
-            const sel = this._sel.kind === "fk" && this._sel.key === k.key ? "sel" : "";
-            const title = assigned
-              ? `${k.key} → ${escapeAttr(this._pageName(assigned))}`
-              : `${k.key}: not assigned`;
-            return `<div class="fk ${assigned ? "assigned" : ""} ${sel}" data-fk="${k.key}"
-                        title="${title}">${k.label}</div>`;
-          })
-          .join("")}</div>`
+      (row) => `<div class="fkrow">${row.map((k) => this._renderFk(k)).join("")}</div>`
     ).join("");
 
     const ledStrip = (leds) =>
@@ -655,11 +644,8 @@ class McduPanel extends HTMLElement {
         .join("")}</div>`;
 
     const airportRow = `<div class="fkrow">
-        <div class="fk ${this._functionKeys["AIRPORT"] ? "assigned" : ""} ${
-          this._sel.kind === "fk" && this._sel.key === "AIRPORT" ? "sel" : ""
-        }" data-fk="AIRPORT" style="max-width:60px"
-           title="${this._functionKeys["AIRPORT"] ? `AIRPORT → ${escapeAttr(this._pageName(this._functionKeys["AIRPORT"]))}` : "AIRPORT: not assigned"}">AIR<br>PORT</div>
-        <div class="fk blank" style="max-width:60px"></div>
+        ${this._renderFk({ key: "AIRPORT", label: "AIR<br>PORT" }, "max-width:60px")}
+        ${this._renderFk({ key: "EMPTY_RIGHT", label: "", blank: true }, "max-width:60px")}
         <div style="flex:1"></div>
       </div>
       <div class="slew">
@@ -716,6 +702,29 @@ class McduPanel extends HTMLElement {
         return `<pre data-row="${i + 1}">${html}</pre>`;
       })
       .join("");
+  }
+
+  /** One function key cap. Blank caps carry no print, so an assigned blank
+   *  key shows its page name — otherwise you cannot tell them apart. */
+  _renderFk(k, extraStyle) {
+    const style = extraStyle ? ` style="${extraStyle}"` : "";
+    if (k.static)
+      return `<div class="fk static"${style} title="${k.key}: fixed function (brightness)">${k.label}</div>`;
+
+    const assigned = this._functionKeys[k.key];
+    const sel = this._sel.kind === "fk" && this._sel.key === k.key ? "sel" : "";
+    const what = k.blank ? `Blank key (${k.key})` : k.key;
+    const title = assigned
+      ? `${what} → ${escapeAttr(this._pageName(assigned))}`
+      : `${what}: not assigned — click to assign a page`;
+    let label = k.label;
+    if (k.blank) {
+      label = assigned
+        ? `<span class="blanklabel">${escapeHtml(this._pageName(assigned).toUpperCase().slice(0, 8))}</span>`
+        : `<span class="blankhint">+</span>`;
+    }
+    return `<div class="fk ${k.blank ? "blankcap" : ""} ${assigned ? "assigned" : ""} ${sel}"
+                 data-fk="${k.key}"${style} title="${title}">${label}</div>`;
   }
 
   _pageName(pageId) {
@@ -846,13 +855,22 @@ class McduPanel extends HTMLElement {
 
   _renderFkEditor(key) {
     const target = this._functionKeys[key] || "";
+    const BLANKS = {
+      EMPTY_LEFT: "Blank key — top row, left of BRT",
+      EMPTY_RIGHT: "Blank key — right of AIR PORT",
+    };
+    const title = BLANKS[key] || `Function key ${key}`;
     return `
-      <h3>Function key ${key}
+      <h3>${title}
         <button class="btn ghost" id="backpage" style="float:right;padding:2px 10px;font-size:11px">Page settings</button>
       </h3>
-      <label class="small">Pressing ${key} on the hardware jumps to this page (from anywhere):</label>
+      <label class="small">Pressing this key on the hardware jumps to this page (from anywhere):</label>
       <select id="fktarget">${this._pageOptions(target, null)}</select>
-      <p class="muted">Choose “—” to unassign the key.</p>`;
+      <p class="muted">Choose “—” to unassign the key.${
+        BLANKS[key]
+          ? " Blank caps have no print, so the assigned page name is shown on the key here."
+          : ""
+      }</p>`;
   }
 
   _renderLedEditor(name) {
